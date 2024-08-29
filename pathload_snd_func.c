@@ -56,7 +56,7 @@ int send_fleet()
   l_int32 tmp=0 ; 
   char *pkt_buf;
   char ctr_buff[8];
-
+  
   if ( (pkt_buf = malloc(cur_pkt_sz*sizeof(char)) ) == NULL )
   {
     printf("ERROR : send_fleet : unable to malloc %ld bytes \n",cur_pkt_sz);
@@ -282,7 +282,7 @@ l_int32 send_latency()
   char *pack_buf ;
   float min_OSdelta[50], ord_min_OSdelta[50];
   int i, len ;
-  int sock_udp ;
+  //int sock_udp ;
   struct timeval first_time ,current_time;
   struct sockaddr_in snd_udp_addr, rcv_udp_addr ;
 
@@ -291,7 +291,7 @@ l_int32 send_latency()
     printf("ERROR : send_latency : unable to malloc %ld bytes \n",max_pkt_sz);
     exit(-1);
   }
-  if ((sock_udp=socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+  /* if ((sock_udp=socket(AF_INET, SOCK_DGRAM, 0)) < 0)
   {
      perror("socket(AF_INET,SOCK_DGRAM,0):");
      exit(-1);
@@ -314,13 +314,14 @@ l_int32 send_latency()
     close(sock_udp);
     exit(-1);
   }
-  
+  printf("333333333\n");
   if(connect(sock_udp,(struct sockaddr *)&rcv_udp_addr, sizeof(rcv_udp_addr)) < 0 )
   {
      perror("connect(sock_udp)");
      close(sock_udp);
      exit(-1);
   }
+  printf("222222\n"); */
   srandom(getpid()); /* Create random payload; does it matter? */
   for (i=0; i<max_pkt_sz-1; i++) pack_buf[i]=(char)(random()&0x000000ff);
   for (i=0; i<50; i++) 
@@ -334,7 +335,7 @@ l_int32 send_latency()
   /* Use median  of measured latencies to avoid outliers */
   order_float(min_OSdelta, ord_min_OSdelta,0, 50);
   if ( pack_buf != NULL ) free(pack_buf);
-  close(sock_udp);
+  //close(sock_udp);
   return (ord_min_OSdelta[25]); 
 }
 
