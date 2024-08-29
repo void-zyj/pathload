@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
   bzero((char*)&snd_udp_addr, sizeof(snd_udp_addr));
   snd_udp_addr.sin_family         = AF_INET;
   snd_udp_addr.sin_addr.s_addr    = htonl(INADDR_ANY);
-  snd_udp_addr.sin_port           = htons(0);
+  snd_udp_addr.sin_port           = htons(TCPSND_PORT);
   if (bind(sock_udp, (struct sockaddr*)&snd_udp_addr, 
         sizeof(snd_udp_addr)) < 0)
   {
@@ -172,11 +172,25 @@ int main(int argc, char* argv[])
 
     /* Form receiving UDP address */
     bzero((char*)&rcv_udp_addr, sizeof(rcv_udp_addr));
-    rcv_udp_addr.sin_family         = AF_INET;
-    rcv_udp_addr.sin_addr.s_addr    = rcv_tcp_addr.sin_addr.s_addr;
-    rcv_udp_addr.sin_port           = htons(UDPRCV_PORT);
+    char *pkt_buf;
+    if ( (pkt_buf = malloc(cur_pkt_sz*sizeof(char)) ) == NULL )
+    {
+      printf("ERROR : send_fleet : unable to malloc %ld bytes \n",cur_pkt_sz);
+      exit(-1);
+    }
+
+    socklen_t addr_len = sizeof(rcv_udp_addr);
+
+    if (recvfrom(sock_udp, pkt_buf, max_pkt_sz, 0, (struct sockaddr *)&rcv_udp_addr, &addr_len) == -1) {
+       perror("recvfrom(sock_udp):");
+       exit(-1);
+    }
+
     /* Connect UDP socket */
-    connect(sock_udp , (struct sockaddr *)&rcv_udp_addr , sizeof(rcv_udp_addr)); 
+    if (connect(sock_udp , (struct sockaddr *)&rcv_udp_addr , sizeof(rcv_udp_addr)) < 0) {
+       perror("connect(sock_udp):");
+      exit(-1);
+    } 
     /* Make TCP socket non-blocking */
     if (fcntl(ctr_strm, F_SETFL, O_NONBLOCK)<0)
     {

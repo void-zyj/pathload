@@ -39,7 +39,7 @@ int main(l_int32 argc, char *argv[])
 {
   extern char *optarg;
   struct hostent *host_snd;
-  struct sockaddr_in snd_tcp_addr, rcv_udp_addr;
+  struct sockaddr_in snd_tcp_addr, rcv_udp_addr, snd_udp_addr;
   struct utsname uts ;
   l_int32 ctr_code;
   l_int32 trend, prev_trend = 0;
@@ -190,12 +190,25 @@ int main(l_int32 argc, char *argv[])
   bzero((char *)&rcv_udp_addr, sizeof(rcv_udp_addr));
   rcv_udp_addr.sin_family = AF_INET;
   rcv_udp_addr.sin_addr.s_addr = INADDR_ANY;
-  rcv_udp_addr.sin_port = htons(UDPRCV_PORT);
+  rcv_udp_addr.sin_port = htons(0);
   if (bind(sock_udp, (struct sockaddr *)&rcv_udp_addr, sizeof(rcv_udp_addr)) < 0)
   {
     perror("ERROR :: failed to bind DGRAM socket:");
     exit(-1);
   }
+  bzero((char *)&snd_udp_addr, sizeof(snd_udp_addr));
+  snd_udp_addr.sin_family = AF_INET;
+  memcpy((void *)&(snd_udp_addr.sin_addr.s_addr), host_snd->h_addr, host_snd->h_length);
+  snd_udp_addr.sin_port = htons(TCPSND_PORT);
+
+  if (connect(sock_udp, (struct sockaddr *)&snd_udp_addr, sizeof(snd_udp_addr)) < 0)
+  {
+    perror("Make sure that pathload_snd runs at reciver:");
+    exit(-1);
+  }else {
+    printf("connect udp socket sucess\n");
+  }
+
   rcv_buff_sz = UDP_BUFFER_SZ;
   if (setsockopt(sock_udp, SOL_SOCKET, SO_RCVBUF, &rcv_buff_sz, sizeof(rcv_buff_sz)) < 0)
   {
@@ -213,6 +226,15 @@ int main(l_int32 argc, char *argv[])
     exit(-1);
   }
 
+  char *pkt_buf;
+
+  
+  if ( (pkt_buf = malloc(1000*sizeof(char)) ) == NULL )
+  {
+    printf("ERROR : send_fleet : unable to malloc %ld bytes \n",1000);
+    exit(-1);
+  }
+  if ( send(sock_udp, pkt_buf, 1000,0 ) == -1 ) {perror("send"); return -1;}
   /* set up control channel */
   if ((sock_tcp = socket(AF_INET, SOCK_STREAM, 0)) < 0)
   {
@@ -233,6 +255,8 @@ int main(l_int32 argc, char *argv[])
   {
     perror("Make sure that pathload_snd runs at sender:");
     exit(-1);
+  }else {
+    printf("connect tcp socket sucess\n");
   }
   if (fcntl(sock_tcp, F_SETFL, O_NONBLOCK) < 0)
   {
@@ -312,6 +336,7 @@ int main(l_int32 argc, char *argv[])
   fprintf(pathload_fp,"  Minimum packet spacing       :: %ld usec\n",min_time_interval );
   max_rate = (max_pkt_sz+28) * 8. / min_time_interval ;
   min_rate = (MIN_PKT_SZ+28) * 8./ MAX_TIME_INTERVAL ;
+
   if(Verbose)
     printf("  Max rate(max_pktsz/min_time) :: %.2fMbps\n",max_rate);
   fprintf(pathload_fp,"  Max rate(max_pktsz/min_time) :: %.2fMbps\n",max_rate);

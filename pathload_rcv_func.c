@@ -50,14 +50,15 @@ l_int32 recvfrom_latency(struct sockaddr_in rcv_udp_addr)
 
   for (j=0; j<50; j++)
   {
-    if ( sendto(sock_udp, random_data, max_pkt_sz, 0, 
-         (struct sockaddr*)&rcv_udp_addr,sizeof(rcv_udp_addr)) == -1)
+    if ( send(sock_udp, random_data, max_pkt_sz, 0) == -1)
         perror("recvfrom_latency");
+
     gettimeofday(&first_time, NULL);
-    recvfrom(sock_udp, random_data, max_pkt_sz, 0, NULL, NULL);
+    recv(sock_udp, random_data, max_pkt_sz, 0);
     gettimeofday(&current_time, NULL);
     min_OSdelta[j]= time_to_us_delta(first_time, current_time);
   }
+
   /* Use median  of measured latencies to avoid outliers */
   order_float(min_OSdelta, ord_min_OSdelta,0,50);
   free(random_data);
