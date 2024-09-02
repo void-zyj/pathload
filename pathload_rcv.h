@@ -77,7 +77,7 @@ EXTERN l_int32 calc_param();
 EXTERN void get_sending_rate() ;
 EXTERN double  get_adr() ;
 EXTERN l_int32 recv_train(l_int32 , struct timeval *, l_int32 );
-EXTERN l_int32 recvfrom_latency(struct sockaddr_in rcv_udp_addr);
+EXTERN l_int32 recvfrom_latency();
 EXTERN double grey_bw_resolution() ;
 EXTERN void get_pct_trend(double[] , l_int32[], l_int32 ) ;
 EXTERN void get_pdt_trend(double[] , l_int32[], l_int32 ) ;

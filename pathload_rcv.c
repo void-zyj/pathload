@@ -318,7 +318,7 @@ int main(l_int32 argc, char *argv[])
   if (Verbose)
     printf("  Maximum packet size          :: %ld bytes\n",max_pkt_sz);
   fprintf(pathload_fp,"  Maximum packet size          :: %ld bytes\n",max_pkt_sz);
-  rcv_latency = (l_int32) recvfrom_latency(rcv_udp_addr);
+  rcv_latency = (l_int32) recvfrom_latency();
   while ((snd_latency = recv_ctr_mesg(sock_tcp, ctr_buff)) == -1);
   if (Verbose)
   {

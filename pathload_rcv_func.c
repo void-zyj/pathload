@@ -33,32 +33,57 @@
 #include "pathload_gbls.h"
 #include "pathload_rcv.h"
 
-l_int32 recvfrom_latency(struct sockaddr_in rcv_udp_addr)
+l_int32 recvfrom_latency()
 {
   char *random_data;
   float min_OSdelta[50], ord_min_OSdelta[50];
-  l_int32 j ;
+  int i, len ;
   struct timeval current_time, first_time ;
-
+  struct sockaddr_in snd_udp_addr, rcv_udp_addr ;
+  int sock_udp;
   if ( (random_data = malloc(max_pkt_sz*sizeof(char)) ) == NULL )
   {
     printf("ERROR : unable to malloc %ld bytes \n",max_pkt_sz);
     exit(-1);
   }
-  srandom(getpid()); /* Create random payload; does it matter? */
-  for (j=0; j<max_pkt_sz-1; j++) random_data[j]=(char)(random()&0x000000ff);
 
-  for (j=0; j<50; j++)
+  if ((sock_udp=socket(AF_INET, SOCK_DGRAM, 0)) < 0)
   {
-    if ( send(sock_udp, random_data, max_pkt_sz, 0) == -1)
-        perror("recvfrom_latency");
-
-    gettimeofday(&first_time, NULL);
-    recv(sock_udp, random_data, max_pkt_sz, 0);
-    gettimeofday(&current_time, NULL);
-    min_OSdelta[j]= time_to_us_delta(first_time, current_time);
+     perror("socket(AF_INET,SOCK_DGRAM,0):");
+     exit(-1);
+  }
+  bzero((char*)&snd_udp_addr, sizeof(snd_udp_addr));
+  snd_udp_addr.sin_family = AF_INET;
+  snd_udp_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  snd_udp_addr.sin_port  = 0 ;
+  if (bind(sock_udp, (struct sockaddr*)&snd_udp_addr, sizeof(snd_udp_addr)) < 0)
+  {
+     perror("bind(sock_udp):");
+     close(sock_udp);
+     exit(-1);
   }
 
+  len = sizeof(rcv_udp_addr);
+  if (getsockname(sock_udp, (struct sockaddr *)&rcv_udp_addr, &len ) < 0 )
+  { 
+    perror("getsockname");
+    close(sock_udp);
+    exit(-1);
+  }
+  
+  srandom(getpid()); /* Create random payload; does it matter? */
+  for (i=0; i<max_pkt_sz-1; i++) random_data[i]=(char)(random()&0x000000ff);
+
+  for (i=0; i<50; i++)
+  {
+    if ( sendto(sock_udp, random_data, max_pkt_sz, 0, 
+         (struct sockaddr*)&rcv_udp_addr,sizeof(rcv_udp_addr)) == -1)
+        perror("recvfrom_latency");
+    gettimeofday(&first_time, NULL);
+    recvfrom(sock_udp, random_data, max_pkt_sz, 0, NULL, NULL);
+    gettimeofday(&current_time, NULL);
+    min_OSdelta[i]= time_to_us_delta(first_time, current_time);
+  }
   /* Use median  of measured latencies to avoid outliers */
   order_float(min_OSdelta, ord_min_OSdelta,0,50);
   free(random_data);
@@ -119,6 +144,7 @@ double get_adr()
     {
       num_burst=0;
       interrupt_coalescence=check_intr_coalescence(arrv_tv,train_len,&num_burst);
+      interrupt_coalescence = 0;
       last=train_len;
       while(!arrv_tv[last].tv_sec) --last;
       delta = time_to_us_delta(arrv_tv[1], arrv_tv[last]);
@@ -553,6 +579,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
               repeat_1=0;
               /* Abort fleet and try to find lower bound */
               abort_fleet=1;
+              printf("22222\n");
               lower_bound=1;
               increase_stream_len=0;
               break ;
@@ -564,6 +591,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
             {
               repeat_2=0;
               /* Abort fleet and retry with longer stream length */
+              printf("111111\n");
               abort_fleet=1;
               increase_stream_len=1;
               break ;
