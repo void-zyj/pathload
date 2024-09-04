@@ -120,13 +120,14 @@ double get_adr()
   ctr_code = SEND_TRAIN | CTR_CODE ;
   send_ctr_mesg(ctr_buff, ctr_code);
   exp_train_id = 0 ;
-  for(i=0;i<100;i++)
+  
+  while ( retry < MAX_TRAIN && bad_train )
+  {
+    for(i=0;i<400;i++)
   {
     arrv_tv[i].tv_sec=0;
     arrv_tv[i].tv_usec=0;
   }
-  while ( retry < MAX_TRAIN && bad_train )
-  {
     if ( train_len == 5)
       train_len = 3;
     else 
@@ -139,16 +140,18 @@ double get_adr()
     spacecnt--;
     ctr_msg_rcvd = 0 ;
     bad_train = recv_train(exp_train_id, arrv_tv, train_len);
+    //printf("bad_train:%d\n", bad_train);
     /* Compute dispersion and bandwidth measurement */
     if (!bad_train) 
     {
       num_burst=0;
       interrupt_coalescence=check_intr_coalescence(arrv_tv,train_len,&num_burst);
       interrupt_coalescence = 0;
-      last=train_len;
+      last=399;
       while(!arrv_tv[last].tv_sec) --last;
       delta = time_to_us_delta(arrv_tv[1], arrv_tv[last]);
       bw_msr = ((28+max_pkt_sz) << 3) * (last-1) / delta;
+      printf("bw_msr:%d delta:%d last:%d\n", bw_msr, delta, last);
       /* tell sender that it was agood train.*/
       ctr_code = GOOD_TRAIN | CTR_CODE ;
       send_ctr_mesg(ctr_buff, ctr_code ) ;
@@ -157,12 +160,14 @@ double get_adr()
     {
       retry++ ;
       /* wait for atleast 10msec before requesting another train */
-      last=train_len;
+      last=399;
       while(!arrv_tv[last].tv_sec) --last;
       first=1 ; 
       while(!arrv_tv[first].tv_sec) ++first ; 
+      //printf("first:%d last:%d\n",first, last);
       delta = time_to_us_delta(arrv_tv[first], arrv_tv[last]);
       bad_bw_msr[num_bad_train++] = ((28+max_pkt_sz) << 3) * (last-first-1) / delta;
+      //printf("num_bad_train:%d bad_bw_msr:%lf delta:%lf\n", num_bad_train, bad_bw_msr[num_bad_train-1], delta);
       select_tv.tv_sec=0;select_tv.tv_usec=10000;
       select(0,NULL,NULL,NULL,&select_tv);
       ctr_code = BAD_TRAIN | CTR_CODE ;
@@ -170,7 +175,7 @@ double get_adr()
       exp_train_id++ ;
     }
   }
-
+  //bw_msr = 10;
   if (Verbose)
   { 
     i = spacecnt;
@@ -189,10 +194,13 @@ double get_adr()
   }
   else
   {
+    //printf("111num_bad_train:%d\n",num_bad_train);
     for ( i=0;i<num_bad_train;i++)
       if ( finite(bad_bw_msr[i]))
         sum += bad_bw_msr[i] ;
     bw_msr = sum/num_bad_train ; 
+    //bw_msr = 10;
+    //printf("bw_msr:%d sum:%d num_bad_train:%d\n", bw_msr, sum, num_bad_train);
     if(Verbose)
       printf("%.2fMbps (I)\n", bw_msr ) ;
     fprintf(pathload_fp,"%.2fMbps (I)\n", bw_msr ) ;
@@ -268,8 +276,10 @@ l_int32 recv_train( l_int32 exp_train_id, struct timeval *time,l_int32 train_len
       train_id = ntohl(train_id) ;
       memcpy(&pack_id, pack_buf+sizeof(l_int32), sizeof(l_int32));
       pack_id=ntohl(pack_id);
+
       if (train_id == exp_train_id && pack_id==exp_pack_id ) 
       {
+
         rcvd++;
         time[pack_id] = current_time ;
         exp_pack_id++;
@@ -370,13 +380,13 @@ l_int32 recv_fleet()
   l_int32 return_val = 0 ;
   l_int32 finished_stream = 0 ;
   l_int32 stream_duration ;
-  l_int32 num_sndr_cs[20],num_rcvr_cs[20];
+  l_int32 num_sndr_cs[200],num_rcvr_cs[200];
   char ctr_buff[8];
   char *pkt_buf ;
   double owdfortd[MAX_STREAM_LEN];
   l_int32 num_substream,substream[MAX_STREAM_LEN];
   l_int32 low,high,len,j;
-  l_int32 b2b_pkt_per_stream[20];
+  l_int32 b2b_pkt_per_stream[200];
   l_int32 tmp_b2b;
 #ifdef THRLIB
   pthread_t tid ; 
@@ -460,15 +470,16 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
         if (FD_ISSET(sock_udp,&readset) )
         {
 #endif
-          if( recvfrom(sock_udp,pkt_buf,cur_pkt_sz,0,NULL,NULL) > 0 )
-          {
-            gettimeofday(&current_time,NULL);
-            memcpy(&fleet_id_n,pkt_buf , sizeof(l_int32));
-            fleet_id = ntohl(fleet_id_n) ;
-            memcpy(&stream_id_n,pkt_buf+sizeof(l_int32) , sizeof(l_int32));
-        stream_id = ntohl(stream_id_n) ;
-        memcpy(&pkt_id_n, pkt_buf+2*sizeof(l_int32), sizeof(l_int32));
-        pkt_id = ntohl(pkt_id_n) ;
+        if( recvfrom(sock_udp,pkt_buf,cur_pkt_sz,0,NULL,NULL) > 0 )
+        {
+          gettimeofday(&current_time,NULL);
+          memcpy(&fleet_id_n,pkt_buf , sizeof(l_int32));
+          fleet_id = ntohl(fleet_id_n) ;
+          memcpy(&stream_id_n,pkt_buf+sizeof(l_int32) , sizeof(l_int32));
+          stream_id = ntohl(stream_id_n) ;
+          memcpy(&pkt_id_n, pkt_buf+2*sizeof(l_int32), sizeof(l_int32));
+          pkt_id = ntohl(pkt_id_n) ;
+          //printf("fleet_id:%d stream_id:%d pkt_id:%d\n", fleet_id, stream_id, pkt_id);
         if ( fleet_id == exp_fleet_id  && stream_id == stream_cnt && 
              pkt_id >= exp_pkt_id )
         {
@@ -477,6 +488,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
           arrv_tv[pkt_id] = current_time ;
           memcpy(&(snd_tv[pkt_id].tv_sec) , pkt_buf+3*sizeof(l_int32), sizeof(l_int32));
           memcpy(&(snd_tv[pkt_id].tv_usec), pkt_buf+4*sizeof(l_int32), sizeof(l_int32));
+          //printf("pkt_id:%d exp_pkt_id:%d\n", pkt_id, exp_pkt_id);
           if ( pkt_id > exp_pkt_id ) /* reordered are considered as lost */
           {
             pkt_lost += ( pkt_id - exp_pkt_id ) ;
@@ -526,6 +538,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
 
     total_pkt_rcvd += pkt_rcvd ;
     finished_stream = 0 ;
+    //printf("pkt_lost:%d stream_len:%d exp_pkt_id:%d\n", pkt_lost, stream_len, exp_pkt_id);
     pkt_lost +=  stream_len  - exp_pkt_id ;
     pkt_loss_rate = (double )pkt_lost * 100. / stream_len ;
     if(Verbose)
@@ -562,6 +575,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
       num += get_sndr_time_interval(snd_tm,&snd_time_interval) ;
       adjust_offset_to_zero(owd, stream_len);  
       num_substream = eliminate_sndr_side_CS(snd_tm,substream);
+      //printf("num_substream:%d\n", num_substream);
       num_sndr_cs[stream_cnt-1] = num_substream ;
       substream[num_substream++]=stream_len-1;
       low=0;
@@ -570,6 +584,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
       for (j=0;j<num_substream;j++)
       {
         high=substream[j]; 
+        //printf("ic_flag:%d\n", ic_flag);
         if ( ic_flag )
         {
           if ( num_bursts < 2 )
@@ -579,7 +594,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
               repeat_1=0;
               /* Abort fleet and try to find lower bound */
               abort_fleet=1;
-              printf("22222\n");
+              //printf("22222\n");
               lower_bound=1;
               increase_stream_len=0;
               break ;
@@ -601,10 +616,10 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
           {
             increase_stream_len=0;
             len=eliminate_b2b_pkt_ic(arrv_tm,owd,owdfortd,low,high,&num_rcvr_cs[stream_cnt-1],&tmp_b2b);
-            /*
-            for(p=0;p<len;p++)
-              printf("%d %f\n",p,owdfortd[p]);
-            */
+            
+            /* for(p=0;p<len;p++)
+              printf("%d owdfortd: %f\n",p,owdfortd[p]); */
+           
             pct_metric[trend_idx]=
               pairwise_comparision_test(owdfortd , 0 , len );
             pdt_metric[trend_idx]=
@@ -615,6 +630,7 @@ K=%ldpackets, T=%ldusec\n",tr, cur_pkt_sz , stream_len,time_interval);
         else
         {
           len=eliminate_rcvr_side_CS(arrv_tm,owd,owdfortd,low,high,&num_rcvr_cs[stream_cnt-1],&tmp_b2b);
+          //printf("len:%d stream_len:%d\n", len, stream_len);
           if ( ( len > MIN_STREAM_LEN ) || ( len >= (stream_len - 1)) )
           {
             get_trend(owdfortd,len);
@@ -1281,12 +1297,17 @@ l_int32 eliminate_rcvr_side_CS ( double rcvr_time_stamp[] , double owd[],double 
   l_int32 min_gap;
 
   min_gap = MIN_TIME_INTERVAL > 1.5*rcv_latency ? MIN_TIME_INTERVAL :2.5*rcv_latency ;
+  //printf("min_gap:%d rcv_latency:%d\n", min_gap, rcv_latency);
   for ( i = low ; i <= high  ; i++ )
   {
+    printf("rcvr_time_stamp:%f-%f = %f\n", rcvr_time_stamp[i+1], rcvr_time_stamp[i], rcvr_time_stamp[i+1]-rcvr_time_stamp[i]);
     if ( rcvr_time_stamp[i] == 0 || rcvr_time_stamp[i+1] == 0 )
       continue ;
-    else if ((rcvr_time_stamp[i+1]- rcvr_time_stamp[i])> min_gap)
+    else if ((rcvr_time_stamp[i+1]- rcvr_time_stamp[i])> min_gap) {
+     
       owdfortd[len++] = owd[i];
+    }
+     
     else 
       b2b_pkt[k++] = i ;
   }
@@ -1442,7 +1463,7 @@ l_int32 aggregate_trend_result()
   l_int32 num_dscrd_strm=0;
   l_int32 i=0;
   l_int32 pct_trend[TREND_ARRAY_LEN] , pdt_trend[TREND_ARRAY_LEN] ; 
-
+  printf("trend_idx:%d\n", trend_idx);
   if (Verbose)
     printf("  PCT metric/stream[%2d] :: ",trend_idx); 
   fprintf(pathload_fp,"  PCT metric/stream[%2d] :: ",trend_idx); 
@@ -1486,6 +1507,7 @@ l_int32 aggregate_trend_result()
        if (Verbose)
          printf("d");
        fprintf(pathload_fp,"d");
+       //printf("11111\n");
        num_dscrd_strm++ ;
     }
     else if ( pct_trend[i] == INCR &&  pdt_trend[i] == INCR )
@@ -1540,12 +1562,13 @@ l_int32 aggregate_trend_result()
   }
   if (Verbose) printf("\n"); 
   fprintf(pathload_fp,"\n"); 
-
+  printf("total:%d\n", total);
   /* check whether number of usable streams is 
      atleast 50% of requested number of streams */
   total-=num_dscrd_strm ;
-  if ( total < num_stream/2 && !slow && !interrupt_coalescence)
+  if ( total < num_stream/2 && !slow && !interrupt_coalescence && 0)
   {
+    printf("total:%d num_stream:%d slow:%d interrupt_coalescence:%d", total, num_stream, slow, interrupt_coalescence);
     bad_fleet_cs = 1 ;
     retry_fleet_cnt_cs++  ;
     return -1 ;
