@@ -1298,14 +1298,15 @@ l_int32 eliminate_rcvr_side_CS ( double rcvr_time_stamp[] , double owd[],double 
 
   min_gap = MIN_TIME_INTERVAL > 1.5*rcv_latency ? MIN_TIME_INTERVAL :2.5*rcv_latency ;
   //printf("min_gap:%d rcv_latency:%d\n", min_gap, rcv_latency);
-  for ( i = low ; i <= high  ; i++ )
+  for ( i = low ; i < high  ; i++ )
   {
-    printf("rcvr_time_stamp:%f-%f = %f\n", rcvr_time_stamp[i+1], rcvr_time_stamp[i], rcvr_time_stamp[i+1]-rcvr_time_stamp[i]);
+    //printf("rcvr_time_stamp:%f-%f = %f\n", rcvr_time_stamp[i+1], rcvr_time_stamp[i], rcvr_time_stamp[i+1]-rcvr_time_stamp[i]);
     if ( rcvr_time_stamp[i] == 0 || rcvr_time_stamp[i+1] == 0 )
       continue ;
     else if ((rcvr_time_stamp[i+1]- rcvr_time_stamp[i])> min_gap) {
      
       owdfortd[len++] = owd[i];
+      printf("owd:%llf\n", owd[i]);
     }
      
     else 
